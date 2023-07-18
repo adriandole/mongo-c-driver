@@ -184,10 +184,6 @@ _mongoc_handshake_get_config_hex_string (void)
       _set_bit (bf, byte_count, MONGOC_MD_FLAG_TRACE);
    }
 
-#ifdef MONGOC_ENABLE_ICU
-   _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_ICU);
-#endif
-
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_CLIENT_SIDE_ENCRYPTION);
 #endif
