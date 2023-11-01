@@ -38,6 +38,7 @@ struct _mongoc_client_pool_t {
    mongoc_queue_t queue;
    mongoc_topology_t *topology;
    mongoc_uri_t *uri;
+   mongoc_array_t clients;
    uint32_t min_pool_size;
    uint32_t max_pool_size;
    uint32_t size;
@@ -155,6 +156,7 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
    bson_mutex_init (&pool->mutex);
    mongoc_cond_init (&pool->cond);
    _mongoc_queue_init (&pool->queue);
+   _mongoc_array_init (&pool->clients, sizeof (mongoc_client_t *));
    pool->uri = mongoc_uri_copy (uri);
    pool->min_pool_size = 0;
    pool->max_pool_size = 100;
@@ -228,6 +230,7 @@ mongoc_client_pool_destroy (mongoc_client_pool_t *pool)
    }
 
    mongoc_topology_destroy (pool->topology);
+   _mongoc_array_destroy (&pool->clients);
 
    mongoc_uri_destroy (pool->uri);
    bson_mutex_destroy (&pool->mutex);
@@ -339,6 +342,7 @@ again:
 
    _start_scanner_if_needed (pool);
 done:
+   // _mongoc_array_append_vals ()
    bson_mutex_unlock (&pool->mutex);
 
    RETURN (client);

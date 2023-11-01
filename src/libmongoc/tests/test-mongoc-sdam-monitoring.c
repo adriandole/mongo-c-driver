@@ -1,4 +1,5 @@
 #include <mongoc/mongoc.h>
+#include "TestSuite.h"
 #include "json-test.h"
 
 #include "mongoc/mongoc-client-private.h"
@@ -1022,6 +1023,37 @@ test_no_duplicates (void)
    mongoc_client_pool_destroy (pool);
 }
 
+static void
+test_heartbeat_kill_clients_on_fail (void)
+{
+   bson_error_t error;
+   mongoc_client_t *client = test_framework_new_default_client ();
+   BSON_ASSERT (client);
+
+   bool ret = mongoc_client_command_simple (
+      client,
+      "admin",
+      tmp_bson ("{'configureFailPoint': 'failCommand',\
+      'mode': 'alwaysOn',\
+      'data': {\
+         'failCommands: ['isMaster', 'hello'],\
+         'closeConnection': false,\
+         'blockConnection': true,\
+         'blockTimeMS': 10000\
+      }}"),
+      NULL,
+      NULL,
+      &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   while (true) {
+      bool r = mongoc_client_command_simple (
+         client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
+      ASSERT_OR_PRINT (r, error);
+      _mongoc_usleep (10000000000);
+   }
+}
+
 void
 test_sdam_monitoring_install (TestSuite *suite)
 {
@@ -1038,6 +1070,7 @@ test_sdam_monitoring_install (TestSuite *suite)
       suite,
       "/server_discovery_and_monitoring/monitoring/topology/disabled",
       test_topology_events_disabled);
+   TestSuite_AddLive (suite, "scratch", test_heartbeat_kill_clients_on_fail);
    TestSuite_AddMockServerTest (
       suite,
       "/server_discovery_and_monitoring/monitoring/heartbeat/single/succeeded",
