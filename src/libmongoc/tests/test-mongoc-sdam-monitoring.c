@@ -10,6 +10,7 @@
 #include "mock_server/future.h"
 #include "mock_server/future-functions.h"
 #include "json-test-monitoring.h"
+#include "unified/runner.h"
 
 #ifdef BSON_HAVE_STRINGS_H
 #include <strings.h>
@@ -547,6 +548,8 @@ test_sdam_monitoring_cb (bson_t *test)
 static void
 test_all_spec_tests (TestSuite *suite)
 {
+   run_unified_tests (
+      suite, JSON_DIR, "server_discovery_and_monitoring/unified");
    install_json_test_suite (suite,
                             JSON_DIR,
                             "server_discovery_and_monitoring/monitoring",
@@ -1036,7 +1039,7 @@ test_heartbeat_kill_clients_on_fail (void)
       tmp_bson ("{'configureFailPoint': 'failCommand',\
       'mode': 'alwaysOn',\
       'data': {\
-         'failCommands: ['isMaster', 'hello'],\
+         'failCommands': ['isMaster', 'hello'],\
          'closeConnection': false,\
          'blockConnection': true,\
          'blockTimeMS': 10000\
@@ -1050,7 +1053,7 @@ test_heartbeat_kill_clients_on_fail (void)
       bool r = mongoc_client_command_simple (
          client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
       ASSERT_OR_PRINT (r, error);
-      _mongoc_usleep (10000000000);
+      _mongoc_usleep (1000000);
    }
 }
 
