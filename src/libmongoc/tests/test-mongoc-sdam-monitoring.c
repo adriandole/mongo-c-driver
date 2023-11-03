@@ -1030,7 +1030,9 @@ static void
 test_heartbeat_kill_clients_on_fail (void)
 {
    bson_error_t error;
-   mongoc_client_t *client = test_framework_new_default_client ();
+   mongoc_client_pool_t *pool = test_framework_new_default_client_pool ();
+   BSON_ASSERT (pool);
+   mongoc_client_t *client = mongoc_client_pool_pop (pool);
    BSON_ASSERT (client);
 
    bool ret = mongoc_client_command_simple (
@@ -1049,9 +1051,11 @@ test_heartbeat_kill_clients_on_fail (void)
       &error);
    ASSERT_OR_PRINT (ret, error);
 
+   int i = 0;
    while (true) {
       bool r = mongoc_client_command_simple (
          client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
+      printf ("ping %d\n", i++);
       ASSERT_OR_PRINT (r, error);
       _mongoc_usleep (1000000);
    }
