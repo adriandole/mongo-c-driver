@@ -19,12 +19,14 @@
 
 #include "mongoc/mcd-rpc.h"
 #include "mongoc/mongoc-client-private.h"
+#include "mongoc/mongoc-client-pool-private.h"
 #include "mongoc/mongoc-error-private.h"
 #include "mongoc/mongoc-ssl-private.h"
 #include "mongoc/mongoc-stream-private.h"
 #include "mongoc/mongoc-topology-background-monitoring-private.h"
 #include "mongoc/mongoc-topology-private.h"
 #include "mongoc/mongoc-trace-private.h"
+#include "mongoc/mongoc-uri-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "monitor"
@@ -51,6 +53,7 @@ _now_ms (void)
 }
 
 struct _mongoc_server_monitor_t {
+   mongoc_client_pool_t *client_pool;
    mongoc_topology_t *topology;
    bson_thread_t thread;
 
@@ -173,6 +176,20 @@ _server_monitor_heartbeat_succeeded (mongoc_server_monitor_t *server_monitor,
    bson_mutex_unlock (&server_monitor->topology->apm_mutex);
 }
 
+typedef struct {
+   const char *host_and_port;
+   uint32_t server_id;
+} disconnect_ctx;
+
+static bool
+disconnect_matching_clients (mongoc_client_t *client, disconnect_ctx *ctx)
+{
+   if (!strcmp (client->uri->hosts->host_and_port, ctx->host_and_port)) {
+      mongoc_cluster_disconnect_node (&client->cluster, ctx->server_id);
+   }
+   return true;
+}
+
 static void
 _server_monitor_heartbeat_failed (mongoc_server_monitor_t *server_monitor,
                                   const bson_error_t *error,
@@ -180,6 +197,13 @@ _server_monitor_heartbeat_failed (mongoc_server_monitor_t *server_monitor,
                                   bool awaited)
 {
    mongoc_apm_server_heartbeat_failed_t event;
+
+   disconnect_ctx ctx;
+   ctx.host_and_port = server_monitor->uri->hosts->host_and_port;
+   ctx.server_id = server_monitor->server_id;
+   mongoc_set_for_each (server_monitor->client_pool->clients,
+                        (mongoc_set_for_each_cb_t) disconnect_matching_clients,
+                        (void *) &ctx);
 
    if (!server_monitor->apm_callbacks.server_heartbeat_failed) {
       return;

@@ -22,10 +22,35 @@
 #include <bson/bson.h>
 
 #include "mongoc-client-pool.h"
+#include "mongoc-queue-private.h"
 #include "mongoc-topology-description.h"
 #include "mongoc-topology-private.h"
 
 BSON_BEGIN_DECLS
+typedef struct _mongoc_client_pool_t {
+   bson_mutex_t mutex;
+   mongoc_cond_t cond;
+   mongoc_queue_t queue;
+   mongoc_topology_t *topology;
+   mongoc_uri_t *uri;
+   uint32_t min_pool_size;
+   uint32_t max_pool_size;
+   uint32_t size;
+#ifdef MONGOC_ENABLE_SSL
+   bool ssl_opts_set;
+   mongoc_ssl_opt_t ssl_opts;
+#endif
+   bool apm_callbacks_set;
+   mongoc_apm_callbacks_t apm_callbacks;
+   void *apm_context;
+   int32_t error_api_version;
+   bool error_api_set;
+   mongoc_server_api_t *api;
+   bool client_initialized;
+   mongoc_set_t *clients;
+   uint32_t client_counter;
+} _mongoc_client_pool_t;
+
 
 /* for tests */
 void

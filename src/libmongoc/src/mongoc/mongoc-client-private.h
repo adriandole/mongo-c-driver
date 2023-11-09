@@ -121,6 +121,7 @@ struct _mongoc_client_t {
    unsigned int csid_rand_seed;
 
    uint32_t generation;
+   uint32_t counter;
 };
 
 /* Defines whether _mongoc_client_command_with_opts() is acting as a read

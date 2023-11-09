@@ -39,23 +39,6 @@
 
 #include <bson-dsl.h>
 
-struct _mongoc_uri_t {
-   char *str;
-   bool is_srv;
-   char srv[BSON_HOST_NAME_MAX + 1];
-   mongoc_host_list_t *hosts;
-   char *username;
-   char *password;
-   char *database;
-   bson_t raw;     /* Unparsed options, see mongoc_uri_parse_options */
-   bson_t options; /* Type-coerced and canonicalized options */
-   bson_t credentials;
-   bson_t compressors;
-   mongoc_read_prefs_t *read_prefs;
-   mongoc_read_concern_t *read_concern;
-   mongoc_write_concern_t *write_concern;
-};
-
 #define MONGOC_URI_ERROR(error, format, ...)         \
    bson_set_error (error,                            \
                    MONGOC_ERROR_COMMAND,             \

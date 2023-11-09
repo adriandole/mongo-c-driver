@@ -201,6 +201,7 @@ typedef struct _mongoc_topology_t {
    bson_t *encrypted_fields_map;
 
    /* For background monitoring. */
+   mongoc_client_pool_t *client_pool;
    mongoc_set_t *server_monitors;
    mongoc_set_t *rtt_monitors;
    bson_mutex_t apm_mutex;

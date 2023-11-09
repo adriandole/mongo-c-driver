@@ -1843,6 +1843,89 @@ test_cluster_stream_invalidation_pooled (void)
    mongoc_client_pool_push (pool, client);
    mongoc_client_pool_destroy (pool);
 }
+// Test that a server monitor receiving an error interrupts an in-progress
+// operation.
+static void
+test_interrupt (void)
+{
+   mock_server_t *server;
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   bson_error_t err;
+   request_t *hello_request, *ping_request;
+   future_t *future;
+   mongoc_uri_t *uri;
+
+   // Use maxWireVersion of 6 (MongoDB version 3.6).
+   // The RTT monitor is only started if streamable hello is used. Streamable
+   // hello requires MongoDB 4.2. This simplifies the test since the RTT monitor
+   // does not need to be considered.
+   const char *hello_reply = BSON_STR (
+      {"minWireVersion" : 6, "maxWireVersion" : 6, "isWritablePrimary" : true});
+
+   server = mock_server_new ();
+   // Auto respond to the "endSessions" command. "endSessions" is expected in
+   // `mongoc_client_pool_destroy`.
+   mock_server_auto_endsessions (server);
+   mock_server_run (server);
+
+   uri = mongoc_uri_copy (mock_server_get_uri (server));
+   // Set a high socketTimeoutMS and serverSelectionTimeoutMS so the "ping"
+   // command hangs.
+   mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_SOCKETTIMEOUTMS, 30000);
+   mongoc_uri_set_option_as_int32 (
+      uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 30000);
+   // Set a low heartbeatFrequencyTimeoutMS so the server monitor sends hello
+   // commands more frequently.
+   mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, 1000);
+
+   pool = mongoc_client_pool_new (uri);
+   client = mongoc_client_pool_pop (pool); // Starts monitoring.
+
+   // Expect hello from the server monitor thread.
+   hello_request = mock_server_receives_any_hello (server);
+   ASSERT (hello_request);
+   reply_to_request (hello_request, MONGOC_REPLY_NONE, 0, 0, 1, hello_reply);
+   request_destroy (hello_request);
+
+   // Send a 'ping'.
+   future = future_client_command_simple (client,
+                                          "db",
+                                          tmp_bson ("{'ping': 1}"),
+                                          NULL /* opts */,
+                                          NULL /* read prefs */,
+                                          &err);
+   // Expect hello from the handshake.
+   hello_request = mock_server_receives_any_hello (server);
+   ASSERT (hello_request);
+   reply_to_request (hello_request, MONGOC_REPLY_NONE, 0, 0, 1, hello_reply);
+   request_destroy (hello_request);
+
+   // Expect a 'ping'.
+   ping_request = mock_server_receives_msg (
+      server, MONGOC_QUERY_NONE, tmp_bson ("{'$db': 'db', 'ping': 1}"));
+   ASSERT (ping_request);
+
+   // Do not respond to the 'ping' now. Wait for the next hello from server
+   // monitor.
+   hello_request = mock_server_receives_any_hello (server);
+   ASSERT (hello_request);
+
+   // Hang up on the server monitor.
+   reply_to_request_with_hang_up (hello_request);
+   reply_to_request (hello_request, MONGOC_REPLY_NONE, 0, 0, 1, hello_reply);
+   request_destroy (hello_request);
+
+   // Expect the server monitor to have killed the in-progress 'ping', resulting
+   // in an immediate failure.
+   BSON_ASSERT (!future_get_bool (future)); // Test fails here.
+   future_destroy (future);
+   mongoc_uri_destroy (uri);
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
+   mock_server_destroy (server);
+}
+
 
 void
 test_cluster_install (TestSuite *suite)
@@ -1976,4 +2059,5 @@ test_cluster_install (TestSuite *suite)
    TestSuite_AddLive (suite,
                       "/Cluster/stream_invalidation/pooled",
                       test_cluster_stream_invalidation_pooled);
+   TestSuite_AddMockServerTest (suite, "/test_interrupt", test_interrupt);
 }
