@@ -16,6 +16,8 @@
 
 #include "common-thread-private.h"
 #include "mongoc-server-monitor-private.h"
+#include "mongoc-server-stream-private.h"
+#include "mongoc-set-private.h"
 
 #include "mongoc/mcd-rpc.h"
 #include "mongoc/mongoc-client-private.h"
@@ -53,7 +55,6 @@ _now_ms (void)
 }
 
 struct _mongoc_server_monitor_t {
-   mongoc_client_pool_t *client_pool;
    mongoc_topology_t *topology;
    bson_thread_t thread;
 
@@ -182,10 +183,19 @@ typedef struct {
 } disconnect_ctx;
 
 static bool
+disconnect_node (void *node, void *ctx)
+{
+   mongoc_stream_socket_t *ss =
+      (mongoc_stream_socket_t *) ((mongoc_cluster_node_t *) node)->stream;
+   mongoc_socket_close_all (ss->sock);
+   return true;
+}
+
+static bool
 disconnect_matching_clients (mongoc_client_t *client, disconnect_ctx *ctx)
 {
    if (!strcmp (client->uri->hosts->host_and_port, ctx->host_and_port)) {
-      mongoc_cluster_disconnect_node (&client->cluster, ctx->server_id);
+      mongoc_set_for_each (client->cluster.nodes, disconnect_node, NULL);
    }
    return true;
 }
@@ -201,7 +211,7 @@ _server_monitor_heartbeat_failed (mongoc_server_monitor_t *server_monitor,
    disconnect_ctx ctx;
    ctx.host_and_port = server_monitor->uri->hosts->host_and_port;
    ctx.server_id = server_monitor->server_id;
-   mongoc_set_for_each (server_monitor->client_pool->clients,
+   mongoc_set_for_each (server_monitor->topology->client_pool->clients,
                         (mongoc_set_for_each_cb_t) disconnect_matching_clients,
                         (void *) &ctx);
 

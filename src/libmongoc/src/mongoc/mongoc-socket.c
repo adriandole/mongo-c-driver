@@ -782,17 +782,13 @@ mongoc_socket_bind (mongoc_socket_t *sock,       /* IN */
 
 
 int
-mongoc_socket_close (mongoc_socket_t *sock) /* IN */
+mongoc_socket_close_owned (mongoc_socket_t *sock, bool owned) /* IN */
 {
-   bool owned;
-
    ENTRY;
 
    BSON_ASSERT (sock);
 
 #ifdef _WIN32
-   owned = (sock->pid == (int) _getpid ());
-
    if (sock->sd != INVALID_SOCKET) {
       if (owned) {
          shutdown (sock->sd, SD_BOTH);
@@ -807,8 +803,6 @@ mongoc_socket_close (mongoc_socket_t *sock) /* IN */
    }
    RETURN (0);
 #else
-   owned = (sock->pid == (int) getpid ());
-
    if (sock->sd != -1) {
       if (owned) {
          shutdown (sock->sd, SHUT_RDWR);
@@ -823,6 +817,25 @@ mongoc_socket_close (mongoc_socket_t *sock) /* IN */
    }
    RETURN (0);
 #endif
+}
+
+int
+mongoc_socket_close (mongoc_socket_t *sock) /* IN */
+{
+   bool owned;
+#ifdef _WIN32
+   owned = (sock->pid == (int) _getpid ());
+#else
+   owned = (sock->pid == (int) getpid ());
+#endif
+   return mongoc_socket_close_owned (sock, owned);
+}
+
+/* Close this socket for all threads */
+int
+mongoc_socket_close_all (mongoc_socket_t *sock)
+{
+   return mongoc_socket_close_owned (sock, true);
 }
 
 
@@ -1092,9 +1105,11 @@ again:
    ret = recv (sock->sd, (char *) buf, (int) buflen, flags);
    failed = (ret == SOCKET_ERROR);
 #else
+   // ret = (sock->sd) == -1 ? -1 : recv (sock->sd, buf, buflen, flags);
    ret = recv (sock->sd, buf, buflen, flags);
    failed = (ret == -1);
 #endif
+   // if (failed && sock->sd != -1) {
    if (failed) {
       _mongoc_socket_capture_errno (sock);
       if (_mongoc_socket_errno_is_again (sock) &&
@@ -1224,7 +1239,8 @@ _mongoc_socket_try_sendv_slow (mongoc_socket_t *sock, /* IN */
    for (size_t i = 0u; i < iovcnt; i++) {
 #ifdef _WIN32
       BSON_ASSERT (bson_in_range_unsigned (int, iov[i].iov_len));
-      const int wrote = send (sock->sd, iov[i].iov_base, (int) iov[i].iov_len, 0);
+      const int wrote =
+         send (sock->sd, iov[i].iov_base, (int) iov[i].iov_len, 0);
       if (wrote == SOCKET_ERROR) {
 #else
       const ssize_t wrote = send (sock->sd, iov[i].iov_base, iov[i].iov_len, 0);

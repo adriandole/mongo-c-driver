@@ -1843,6 +1843,7 @@ test_cluster_stream_invalidation_pooled (void)
    mongoc_client_pool_push (pool, client);
    mongoc_client_pool_destroy (pool);
 }
+
 // Test that a server monitor receiving an error interrupts an in-progress
 // operation.
 static void
@@ -1913,7 +1914,7 @@ test_interrupt (void)
 
    // Hang up on the server monitor.
    reply_to_request_with_hang_up (hello_request);
-   reply_to_request (hello_request, MONGOC_REPLY_NONE, 0, 0, 1, hello_reply);
+   // reply_to_request (hello_request, MONGOC_REPLY_NONE, 0, 0, 1, hello_reply);
    request_destroy (hello_request);
 
    // Expect the server monitor to have killed the in-progress 'ping', resulting
@@ -2061,3 +2062,5 @@ test_cluster_install (TestSuite *suite)
                       test_cluster_stream_invalidation_pooled);
    TestSuite_AddMockServerTest (suite, "/test_interrupt", test_interrupt);
 }
+
+// set MONGOC_TEST_FUTURE_TIMEOUT_MS

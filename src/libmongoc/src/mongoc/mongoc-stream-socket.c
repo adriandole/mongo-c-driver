@@ -26,12 +26,6 @@
 #define MONGOC_LOG_DOMAIN "stream"
 
 
-struct _mongoc_stream_socket_t {
-   mongoc_stream_t vtable;
-   mongoc_socket_t *sock;
-};
-
-
 static BSON_INLINE int64_t
 get_expiration (int32_t timeout_msec)
 {
@@ -162,7 +156,8 @@ _mongoc_stream_socket_readv (mongoc_stream_t *stream,
          if (ret >= (ssize_t) min_bytes) {
             RETURN (ret);
          }
-         errno = mongoc_socket_errno (ss->sock);
+         if (ss && ss->sock)
+            errno = mongoc_socket_errno (ss->sock);
          RETURN (-1);
       }
 

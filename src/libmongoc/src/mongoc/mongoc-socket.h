@@ -68,6 +68,8 @@ mongoc_socket_bind (mongoc_socket_t *sock,
 MONGOC_EXPORT (int)
 mongoc_socket_close (mongoc_socket_t *socket);
 MONGOC_EXPORT (int)
+mongoc_socket_close_all (mongoc_socket_t *socket);
+MONGOC_EXPORT (int)
 mongoc_socket_connect (mongoc_socket_t *sock,
                        const struct sockaddr *addr,
                        mongoc_socklen_t addrlen,

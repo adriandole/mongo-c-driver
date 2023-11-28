@@ -34,6 +34,12 @@ BSON_BEGIN_DECLS
 #define MONGOC_STREAM_GRIDFS_UPLOAD 6
 #define MONGOC_STREAM_GRIDFS_DOWNLOAD 7
 
+struct _mongoc_stream_socket_t {
+   mongoc_stream_t vtable;
+   mongoc_socket_t *sock;
+};
+
+
 bool
 mongoc_stream_wait (mongoc_stream_t *stream, int64_t expire_at);
 
