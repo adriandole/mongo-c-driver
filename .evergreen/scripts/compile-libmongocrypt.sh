@@ -16,7 +16,7 @@ compile_libmongocrypt() {
     # git clone -q https://github.com/mongodb/libmongocrypt || return
     # Check out commit containing MONGOCRYPT-605
     # git -C libmongocrypt checkout c87cc3489c9a68875ff7fab541154841469991fb
-    git clone -q --depth=1 https://github.com/adriandole/libmongocrypt --branch kmip-rebase
+    git clone -q --depth=1 https://github.com/adriandole/libmongocrypt --branch kmip-named-rebase
   }
 
   declare -a crypt_cmake_flags=(
